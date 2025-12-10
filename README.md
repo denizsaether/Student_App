@@ -1,1 +1,1 @@
-# prosjekt: Student app, backend: python(fastAPI), frontend: dart(flutter)
+# prosjekt: Student app, backend: python(fastAPI), frontend: typescript(tailwind)
