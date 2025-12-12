@@ -94,7 +94,7 @@ function Dashboard({ subjects, logs }: DashboardProps) {
   return (
     <div className="min-h-screen px-6 pb-24 pt-6 text-gray-100 bg-gradient-to-b from-[#050509] to-[#15171a]">
       {/* Hero-kort */}
-      <section className="mb-6 rounded-2xl p-[1px] bg-gradient-to-r from-blue-500 via-purple-500 to-cyan-400 shadow-xl shadow-black/40">
+      <section className="mb-6 rounded-2xl p-[1px] bg-gradient-to-r from-blue-500 via-purple-500 to-cyan-400 shadow-xl shadow-blue-500/10">
         <div className="rounded-2xl bg-[#050509] px-4 py-5">
           <p className="text-xs uppercase tracking-[0.2em] text-gray-400 mb-1">
             Clocked In

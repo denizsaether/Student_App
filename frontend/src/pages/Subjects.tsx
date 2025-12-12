@@ -55,7 +55,7 @@ function Subjects({ subjects, setSubjects }: SubjectsProps) {
   return (
     ///design bakgrunn
     <div className="min-h-screen px-6 pb-24 pt-6 text-gray-100 
-                    bg-gradient-to-b from-[#0f0f11] to-[#1c677f]">
+                    bg-gradient-to-b from-[#050509] to-[#15171a]">
 
       <h2 className="text-3xl font-bold mb-6 tracking-tight">
         Your inspiring Subjects :) 
