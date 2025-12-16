@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { loadLogs, loadSubjects, saveLogs, saveSubjects } from "./storage";
-import Dashboard from "./pages/Dashboard";
-import Subjects from "./pages/Subjects";
-import LogHours from "./pages/LogHours";
+import Dashboard from "./pages/dashboard";
+import Subjects from "./pages/subjects";
+import LogHours from "./pages/loghours";
 
 import type { Subject, LogEntry } from "./types";
 
