@@ -1,14 +1,16 @@
+import { useMemo, useState } from "react";
+import type { TouchEvent } from "react";
 import type { Subject, LogEntry } from "../types";
 import { calculateDailyStreak } from "../utils/streak";
 import { isDateInThisWeek } from "../utils/date";
 import { minutesToHours } from "../utils/format";
-import { useMemo, useState } from "react";
+
 
 interface DashboardProps {
   subjects: Subject[];
   logs: LogEntry[];
 }
-
+// lagrer dato som YYYY-MM-DD -> flyttes til utils senere?
 function toLocalDateKey(date: Date): string {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, "0");
@@ -17,9 +19,7 @@ function toLocalDateKey(date: Date): string {
 }
 
 function buildWeekStrip(logs: LogEntry[]) {
-  const daySet = new Set<string>(
-    logs.map((l) => toLocalDateKey(new Date(l.createdAtISO)))
-  );
+  const daySet = new Set<string>(logs.map((l) => toLocalDateKey(new Date(l.createdAtISO))));
 
   const now = new Date();
   const startOfWeek = new Date(now);
@@ -35,39 +35,91 @@ function buildWeekStrip(logs: LogEntry[]) {
     d.setDate(startOfWeek.getDate() + i);
     const key = toLocalDateKey(d);
 
-    return {
-      key,
-      label: labels[i],
-      isActive: daySet.has(key),
-    };
+    return { key, label: labels[i], isActive: daySet.has(key) };
   });
 }
 
 function Dashboard({ subjects, logs }: DashboardProps) {
+  // ===== Kun aktive fag teller mot ukemål og vises i dashboard-listing =====
+  const activeSubjects = useMemo(
+    () => subjects.filter((s) => !(s.isArchived ?? false)),
+    [subjects]
+  );
+
   // ===== Uke-data =====
   const logsThisWeek = logs.filter((log) => isDateInThisWeek(log.createdAtISO));
 
-  const totalMinutes = logsThisWeek.reduce(
-    (sum, log) => sum + log.durationMinutes,
-    0
-  );
-
+  const totalMinutes = logsThisWeek.reduce((sum, log) => sum + log.durationMinutes, 0);
   const totalHours = minutesToHours(totalMinutes);
 
-  // Samlet ukesmål (timer)
-  const totalWeeklyGoal = subjects.reduce(
-    (sum, subject) => sum + subject.weeklyGoal,
-    0
-  );
+  // Samlet ukesmål (kun aktive fag)
+  const totalWeeklyGoal = activeSubjects.reduce((sum, subject) => sum + subject.weeklyGoal, 0);
 
   const overallProgressPercent =
-    totalWeeklyGoal > 0
-      ? Math.min(100, (totalHours / totalWeeklyGoal) * 100)
-      : 0;
+    totalWeeklyGoal > 0 ? Math.min(100, (totalHours / totalWeeklyGoal) * 100) : 0;
 
-  // ===== Stats per fag (denne uken) =====
+  // ===== On-track (motivational pacing) =====
+  const nowForTrack = new Date();
+  const jsDay = nowForTrack.getDay(); // 0=søn, 1=man, ... 6=lør
+  const dayIndexMon0 = (jsDay + 6) % 7; // man=0 ... søn=6
+  const expectedShare = (dayIndexMon0 + 1) / 7;
+
+  const expectedHoursNow = totalWeeklyGoal > 0 ? totalWeeklyGoal * expectedShare : 0;
+  const deltaHours = totalHours - expectedHoursNow;
+
+  const toleranceHours =
+    totalWeeklyGoal > 0 ? Math.max(0.25, totalWeeklyGoal * 0.05) : 0;
+
+  type TrackStatus = "ahead" | "ontrack" | "behind" | "nogoal";
+
+  const trackStatus: TrackStatus =
+    totalWeeklyGoal === 0
+      ? "nogoal"
+      : deltaHours > toleranceHours
+      ? "ahead"
+      : deltaHours < -toleranceHours
+      ? "behind"
+      : "ontrack";
+
+  const trackLabel =
+    trackStatus === "ahead"
+      ? "Du ligger foran planen"
+      : trackStatus === "behind"
+      ? "Du ligger litt bak planen"
+      : trackStatus === "ontrack"
+      ? "Du er på sporet"
+      : "Sett et ukemål for pacing";
+
+  const trackHint =
+    trackStatus === "ahead"
+      ? "Sterkt – hold flyten."
+      : trackStatus === "behind"
+      ? "En liten økt i dag fikser det."
+      : trackStatus === "ontrack"
+      ? "Fortsett i samme tempo."
+      : "Legg inn mål på Fag-siden.";
+
+  const trackChipClass =
+    trackStatus === "ahead"
+      ? "border-emerald-400/25 bg-emerald-500/10"
+      : trackStatus === "behind"
+      ? "border-rose-400/25 bg-rose-500/10"
+      : trackStatus === "ontrack"
+      ? "border-cyan-400/25 bg-cyan-500/10"
+      : "border-white/10 bg-white/5";
+
+  const trackDotClass =
+    trackStatus === "ahead"
+      ? "bg-emerald-400"
+      : trackStatus === "behind"
+      ? "bg-rose-400"
+      : trackStatus === "ontrack"
+      ? "bg-cyan-300"
+      : "bg-gray-400";
+
+  // ===== Stats per aktivt fag (denne uken) =====
   const subjectStats = useMemo(() => {
-    return subjects.map((subject) => {
+    return activeSubjects.map((subject) => {
       const minutesForSubject = logsThisWeek
         .filter((log) => log.subjectId === subject.id)
         .reduce((sum, log) => sum + log.durationMinutes, 0);
@@ -79,13 +131,9 @@ function Dashboard({ subjects, logs }: DashboardProps) {
           ? Math.min(100, (hoursForSubject / subject.weeklyGoal) * 100)
           : 0;
 
-      return {
-        ...subject,
-        hoursForSubject,
-        progressPercent,
-      };
+      return { ...subject, hoursForSubject, progressPercent };
     });
-  }, [subjects, logsThisWeek]);
+  }, [activeSubjects, logsThisWeek]);
 
   const topSubject =
     subjectStats.length > 0
@@ -96,85 +144,69 @@ function Dashboard({ subjects, logs }: DashboardProps) {
 
   const hasData = totalMinutes > 0;
 
-  // ===== Streak + uke-strip =====
+  // ===== Streak + uke-strip (basert på alle logs, også arkiverte fag) =====
   const streak = calculateDailyStreak(logs);
   const weekStrip = buildWeekStrip(logs);
 
-  // ===== Karusell (dots) =====
+  // ===== Karusell =====
   const [subjectIndex, setSubjectIndex] = useState(0);
-  // ===== touch funksjonalitet =====
-  const [dragOffsetX, setDragOffsetX] = useState(0);
 
+  // touch
+  const [dragOffsetX, setDragOffsetX] = useState(0);
   const [touchStartX, setTouchStartX] = useState<number | null>(null);
   const [touchDragging, setTouchDragging] = useState(false);
-
   const SWIPE_THRESHOLD_PX = 60;
 
   const carouselSubjects = useMemo(() => {
-    return subjectStats
-      .slice()
-      .sort((a, b) => b.hoursForSubject - a.hoursForSubject);
+    return subjectStats.slice().sort((a, b) => b.hoursForSubject - a.hoursForSubject);
   }, [subjectStats]);
 
   const safeIndex =
-    carouselSubjects.length === 0
-      ? 0
-      : Math.min(subjectIndex, carouselSubjects.length - 1);
+    carouselSubjects.length === 0 ? 0 : Math.min(subjectIndex, carouselSubjects.length - 1);
 
   const current = carouselSubjects[safeIndex] ?? null;
 
   const goPrev = (): void => {
     if (carouselSubjects.length === 0) return;
-    setSubjectIndex((prev) =>
-      prev === 0 ? carouselSubjects.length - 1 : prev - 1
-    );
+    setSubjectIndex((prev) => (prev === 0 ? carouselSubjects.length - 1 : prev - 1));
   };
 
   const goNext = (): void => {
     if (carouselSubjects.length === 0) return;
-    setSubjectIndex((prev) =>
-      prev === carouselSubjects.length - 1 ? 0 : prev + 1
-    );
+    setSubjectIndex((prev) => (prev === carouselSubjects.length - 1 ? 0 : prev + 1));
   };
 
-  const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>): void => {
-  const x = e.touches[0]?.clientX ?? null;
-  if (x === null) return;
-  setTouchStartX(x);
-  setTouchDragging(true);
-  setDragOffsetX(0);
-};
+  const handleTouchStart = (e: TouchEvent<HTMLDivElement>): void => {
+    const x = e.touches[0]?.clientX ?? null;
+    if (x === null) return;
+    setTouchStartX(x);
+    setTouchDragging(true);
+    setDragOffsetX(0);
+  };
 
-  const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>): void => {
-  if (!touchDragging || touchStartX === null) return;
-  const x = e.touches[0]?.clientX ?? null;
-  if (x === null) return;
-  const delta = x - touchStartX;
-  setDragOffsetX(delta);
-};
+  const handleTouchMove = (e: TouchEvent<HTMLDivElement>): void => {
+    if (!touchDragging || touchStartX === null) return;
+    const x = e.touches[0]?.clientX ?? null;
+    if (x === null) return;
+    setDragOffsetX(x - touchStartX);
+  };
 
-const handleTouchEnd = (): void => {
-  if (!touchDragging || touchStartX === null) {
+  const handleTouchEnd = (): void => {
+    if (!touchDragging || touchStartX === null) {
+      setTouchDragging(false);
+      setTouchStartX(null);
+      setDragOffsetX(0);
+      return;
+    }
+
+    if (dragOffsetX <= -SWIPE_THRESHOLD_PX) goNext();
+    else if (dragOffsetX >= SWIPE_THRESHOLD_PX) goPrev();
+
     setTouchDragging(false);
     setTouchStartX(null);
     setDragOffsetX(0);
-    return;
-  }
+  };
 
-  if (dragOffsetX <= -SWIPE_THRESHOLD_PX) {
-    // swipe left
-    goNext();
-  } else if (dragOffsetX >= SWIPE_THRESHOLD_PX) {
-    // swipe right
-    goPrev();
-  }
-
-  setTouchDragging(false);
-  setTouchStartX(null);
-  setDragOffsetX(0);
-};
-
-  // Status-tekst
   let statusText = "La oss bygge litt momentum.";
   if (overallProgressPercent >= 100) statusText = "Du har nådd ukesmålet ditt 💪";
   else if (overallProgressPercent >= 60) statusText = "Sterk innsats så langt!";
@@ -191,9 +223,7 @@ const handleTouchEnd = (): void => {
         {/* HERO */}
         <section className="mb-6 rounded-2xl p-[1px] bg-gradient-to-r from-blue-500 via-purple-500 to-cyan-400 shadow-xl shadow-black/50">
           <div className="rounded-2xl bg-[#07070c]/90 backdrop-blur px-4 py-5 border border-white/5">
-            <p className="text-xs uppercase tracking-[0.2em] text-gray-400 mb-1">
-              Clocked In
-            </p>
+            <p className="text-xs uppercase tracking-[0.2em] text-gray-400 mb-1">Clocked In</p>
 
             <h1 className="text-2xl font-semibold mb-1">
               {hasData ? "Fin progresjon ⚡️" : "Klar for en produktiv uke?"}
@@ -203,9 +233,7 @@ const handleTouchEnd = (): void => {
 
             <div className="flex items-end justify-between gap-4">
               <div>
-                <p className="text-xs text-gray-400 mb-1">
-                  Totalt logget (denne uken)
-                </p>
+                <p className="text-xs text-gray-400 mb-1">Totalt logget (denne uken)</p>
                 <p className="text-2xl font-bold text-blue-400">
                   {totalHours.toFixed(1)}{" "}
                   <span className="text-sm font-normal text-gray-300">timer</span>
@@ -216,9 +244,7 @@ const handleTouchEnd = (): void => {
                 <div className="flex justify-between text-[11px] text-gray-400 mb-1">
                   <span>Fremgang mot mål</span>
                   <span>
-                    {totalWeeklyGoal > 0
-                      ? `${overallProgressPercent.toFixed(0)}%`
-                      : "Ingen mål satt"}
+                    {totalWeeklyGoal > 0 ? `${overallProgressPercent.toFixed(0)}%` : "Ingen mål satt"}
                   </span>
                 </div>
 
@@ -228,6 +254,17 @@ const handleTouchEnd = (): void => {
                     style={{ width: `${overallProgressPercent}%` }}
                   />
                 </div>
+
+                {/* On track chip */}
+                {totalWeeklyGoal > 0 && (
+                  <div className={"mt-3 rounded-xl border px-3 py-2 backdrop-blur " + trackChipClass}>
+                    <div className="flex items-center gap-2">
+                      <span className={"h-2 w-2 rounded-full " + trackDotClass} />
+                      <p className="text-sm font-semibold">{trackLabel}</p>
+                    </div>
+                    <p className="text-xs text-gray-400 mt-1">{trackHint}</p>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -236,18 +273,14 @@ const handleTouchEnd = (): void => {
         {/* STREAK + UKE */}
         <section className="mb-6 grid grid-cols-3 gap-3">
           <div className="col-span-1 rounded-xl border border-white/5 bg-[#101018]/70 backdrop-blur p-3">
-            <p className="text-[11px] uppercase tracking-[0.18em] text-gray-400 mb-1">
-              Streak
-            </p>
+            <p className="text-[11px] uppercase tracking-[0.18em] text-gray-400 mb-1">Streak</p>
             <p className="text-lg font-semibold text-emerald-400">🔥 {streak}</p>
             <p className="text-xs text-gray-400 mt-1">dager på rad</p>
           </div>
 
           <div className="col-span-2 rounded-xl border border-white/5 bg-[#101018]/70 backdrop-blur p-3">
             <div className="flex items-center justify-between mb-2">
-              <p className="text-[11px] uppercase tracking-[0.18em] text-gray-400">
-                Ukeoversikt
-              </p>
+              <p className="text-[11px] uppercase tracking-[0.18em] text-gray-400">Ukeoversikt</p>
               <p className="text-xs text-gray-400">Man–Søn</p>
             </div>
 
@@ -268,22 +301,18 @@ const handleTouchEnd = (): void => {
               ))}
             </div>
 
-            <p className="mt-2 text-[11px] text-gray-500">
-              Grønne dager = minst én økt logget.
-            </p>
+            <p className="mt-2 text-[11px] text-gray-500">Grønne dager = minst én økt logget.</p>
           </div>
         </section>
 
-        {/* TOPP FAG */}
+        {/* TOPP FAG (kun aktive) */}
         {topSubject && (
           <section className="mb-6 bg-[#101018]/70 border border-white/5 rounded-xl p-4 shadow-md shadow-black/30 backdrop-blur">
             <p className="text-[11px] uppercase tracking-[0.16em] text-gray-400 mb-1">
               Mest jobbet fag (denne uken)
             </p>
             <p className="text-lg font-semibold mb-1">{topSubject.name}</p>
-            <p className="text-sm text-gray-400 mb-2">
-              {topSubject.hoursForSubject.toFixed(1)} t logget.
-            </p>
+            <p className="text-sm text-gray-400 mb-2">{topSubject.hoursForSubject.toFixed(1)} t logget.</p>
 
             <div className="w-full h-2 rounded-full bg-[#14141c] overflow-hidden">
               <div
@@ -294,21 +323,20 @@ const handleTouchEnd = (): void => {
           </section>
         )}
 
-        {/* KARUSELL MED DOTS */}
+        {/* KARUSELL */}
         <section className="mt-6">
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-lg font-semibold">Fag denne uken</h2>
+            <h2 className="text-lg font-semibold">Alle fag</h2>
             <p className="text-xs text-gray-400">
-              {carouselSubjects.length > 0
-                ? `${safeIndex + 1}/${carouselSubjects.length}`
-                : ""}
+              {carouselSubjects.length > 0 ? `${safeIndex + 1}/${carouselSubjects.length}` : ""}
             </p>
           </div>
 
           {carouselSubjects.length === 0 ? (
             <p className="text-sm text-gray-400">
-              Du har ikke lagt til noen fag ennå. Gå til{" "}
-              <span className="font-semibold">Fag</span>-siden.
+              {activeSubjects.length === 0
+                ? "Du har ingen aktive fag. Legg til et fag på Fag-siden."
+                : "Ingen økter logget denne uken enda."}
             </p>
           ) : (
             <div
@@ -319,21 +347,15 @@ const handleTouchEnd = (): void => {
               style={{
                 transform: `translateX(${touchDragging ? dragOffsetX : 0}px)`,
                 transition: touchDragging ? "none" : "transform 160ms ease-out",
-             }}
-              >
+              }}
+            >
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="text-[11px] uppercase tracking-[0.16em] text-gray-400 mb-1">
-                    Fremgang
-                  </p>
-                  <h3 className="text-lg font-semibold leading-tight">
-                    {current?.name}
-                  </h3>
+                  <p className="text-[11px] uppercase tracking-[0.16em] text-gray-400 mb-1">Fremgang</p>
+                  <h3 className="text-lg font-semibold leading-tight">{current?.name}</h3>
                   <p className="text-xs text-gray-400 mt-1">
                     {current?.hoursForSubject.toFixed(1)} t logget denne uken
-                    {current && current.weeklyGoal > 0
-                      ? ` • mål ${current.weeklyGoal} t`
-                      : ""}
+                    {current && current.weeklyGoal > 0 ? ` • mål ${current.weeklyGoal} t` : ""}
                   </p>
                 </div>
 
@@ -367,9 +389,7 @@ const handleTouchEnd = (): void => {
                   <div className="w-full h-2 rounded-full bg-[#14141c] overflow-hidden">
                     <div
                       className="h-2 rounded-full bg-gradient-to-r from-blue-500 via-purple-500 to-cyan-400 transition-all"
-                      style={{
-                        width: `${Math.min(100, current.progressPercent)}%`,
-                      }}
+                      style={{ width: `${Math.min(100, current.progressPercent)}%` }}
                     />
                   </div>
 
@@ -383,9 +403,7 @@ const handleTouchEnd = (): void => {
                           onClick={() => setSubjectIndex(i)}
                           className={
                             "h-2 w-2 rounded-full transition " +
-                            (isActive
-                              ? "bg-white/80"
-                              : "bg-white/20 hover:bg-white/35")
+                            (isActive ? "bg-white/80" : "bg-white/20 hover:bg-white/35")
                           }
                           aria-label={`Gå til fag ${i + 1}`}
                         />

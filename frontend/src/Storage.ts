@@ -1,13 +1,19 @@
 import type { Subject, LogEntry } from "./types";
 
-const SUBJECTS_KEY = "clockedin_subjects_v1";
-const LOGS_KEY = "clockedin_logs_v1";
+const SUBJECTS_KEY = "subjects";
+const LOGS_KEY = "logs";
 
 export function loadSubjects(): Subject[] {
   try {
     const raw = localStorage.getItem(SUBJECTS_KEY);
     if (!raw) return [];
-    return JSON.parse(raw) as Subject[];
+    const parsed = JSON.parse(raw) as Subject[];
+
+    return parsed.map((s) => ({
+      ...s,
+      weeklyGoal: Number(s.weeklyGoal ?? 0),
+      isArchived: Boolean(s.isArchived ?? false),
+    }));
   } catch {
     return [];
   }

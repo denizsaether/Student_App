@@ -9,33 +9,26 @@ import type { Subject, LogEntry } from "./types";
 function App() {
   const [page, setPage] = useState<"dashboard" | "subjects" | "log">("dashboard");
 
-  // last inn lagrede data
-const [subjects, setSubjects] = useState<Subject[]>(() => loadSubjects());
-const [logs, setLogs] = useState<LogEntry[]>(() => loadLogs());
+  const [subjects, setSubjects] = useState<Subject[]>(() => loadSubjects());
+  const [logs, setLogs] = useState<LogEntry[]>(() => loadLogs());
 
-// lagre data ved endring 
-useEffect(() => {
-  saveSubjects(subjects);
-}, [subjects]);
+  useEffect(() => {
+    saveSubjects(subjects);
+  }, [subjects]);
 
-useEffect(() => {
-  saveLogs(logs);
-}, [logs]);
+  useEffect(() => {
+    saveLogs(logs);
+  }, [logs]);
 
-// sideinnhold og navigasjonreturn (
-return (
-  ///global bakgrunn
+  return (
     <div className="min-h-screen text-gray-100 bg-gradient-to-b from-[#050509] via-[#0b0b12] to-[#15171a] pb-24">
-      {/* Subtle glow bak */}
       <div className="pointer-events-none fixed inset-0 opacity-40">
         <div className="absolute -top-24 left-1/2 h-72 w-72 -translate-x-1/2 rounded-full bg-blue-500/20 blur-3xl" />
         <div className="absolute top-32 right-[-80px] h-72 w-72 rounded-full bg-purple-500/15 blur-3xl" />
         <div className="absolute bottom-10 left-[-120px] h-72 w-72 rounded-full bg-cyan-400/10 blur-3xl" />
       </div>
 
-      {/* SIDE-INNHOLD */}
       <main className="relative mx-auto max-w-xl px-5 pt-6">
-        {/* Page header */}
         <div className="mb-5">
           <p className="text-[11px] uppercase tracking-[0.2em] text-gray-400">
             Clocked In
@@ -51,20 +44,17 @@ return (
             {page === "dashboard"
               ? "Ukestatus og fremgang"
               : page === "subjects"
-              ? "Administrer fag og mål"
+              ? "Administrer fag (arkiver når semesteret er ferdig)"
               : "Registrer økter og rediger historikk"}
           </p>
         </div>
 
-        {/* Content card */}
         <div className="rounded-2xl border border-[#232635] bg-[#0b0b12]/70 shadow-xl shadow-black/40 backdrop-blur">
           <div className="p-4">
-            {page === "dashboard" && (
-              <Dashboard subjects={subjects} logs={logs} />
-            )}
+            {page === "dashboard" && <Dashboard subjects={subjects} logs={logs} />}
 
             {page === "subjects" && (
-              <Subjects subjects={subjects} setSubjects={setSubjects} />
+              <Subjects subjects={subjects} setSubjects={setSubjects} logs={logs} />
             )}
 
             {page === "log" && (
@@ -76,12 +66,10 @@ return (
         <div className="h-24" />
       </main>
 
-      {/* FOOTER / NAVIGATION */}
       <footer className="fixed bottom-0 left-0 w-full">
         <div className="mx-auto max-w-xl px-5 pb-5">
           <div className="rounded-2xl border border-[#232635] bg-[#0b0b12]/80 shadow-2xl shadow-black/50 backdrop-blur">
             <div className="flex justify-around px-3 py-2">
-              {/* Dashboard */}
               <button
                 type="button"
                 onClick={() => setPage("dashboard")}
@@ -100,25 +88,13 @@ return (
                       : "border-transparent bg-transparent group-hover:border-[#232635] group-hover:bg-white/5")
                   }
                 >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    strokeWidth="2"
-                    stroke="currentColor"
-                    className="h-5 w-5"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M3 10l9-7 9 7v10a1 1 0 01-1 1h-5m-6 0H4a1 1 0 01-1-1V10"
-                    />
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor" className="h-5 w-5">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 10l9-7 9 7v10a1 1 0 01-1 1h-5m-6 0H4a1 1 0 01-1-1V10" />
                   </svg>
                 </div>
                 Dashboard
               </button>
 
-              {/* Fag */}
               <button
                 type="button"
                 onClick={() => setPage("subjects")}
@@ -137,25 +113,13 @@ return (
                       : "border-transparent bg-transparent group-hover:border-[#232635] group-hover:bg-white/5")
                   }
                 >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    strokeWidth="2"
-                    stroke="currentColor"
-                    className="h-5 w-5"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M12 6v12m6-6H6"
-                    />
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor" className="h-5 w-5">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m6-6H6" />
                   </svg>
                 </div>
                 Fag
               </button>
 
-              {/* Timer */}
               <button
                 type="button"
                 onClick={() => setPage("log")}
@@ -174,26 +138,14 @@ return (
                       : "border-transparent bg-transparent group-hover:border-[#232635] group-hover:bg-white/5")
                   }
                 >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    strokeWidth="2"
-                    stroke="currentColor"
-                    className="h-5 w-5"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-                    />
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor" className="h-5 w-5">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                 </div>
                 Timer
               </button>
             </div>
 
-            {/* active indicator */}
             <div className="px-4 pb-3">
               <div className="h-[2px] w-full rounded-full bg-[#15171f] overflow-hidden">
                 <div
