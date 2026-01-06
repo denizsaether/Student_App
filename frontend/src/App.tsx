@@ -1,3 +1,8 @@
+import type { Session } from "@supabase/supabase-js";
+import { supabase } from "./supabaseClient";
+import AuthPanel from "./AuthPanel";
+
+
 import { useEffect, useState } from "react";
 import { loadLogs, loadSubjects, saveLogs, saveSubjects } from "./storage";
 import Dashboard from "./pages/dashboard";
@@ -7,6 +12,22 @@ import LogHours from "./pages/loghours";
 import type { Subject, LogEntry } from "./types";
 
 function App() {
+  const [session, setSession] = useState<Session | null>(null);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      setSession(data.session);
+    });
+
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => {
+      setSession(s);
+    });
+
+    return () => {
+      sub.subscription.unsubscribe();
+    };
+  }, []);
+
   const [page, setPage] = useState<"dashboard" | "subjects" | "log">("dashboard");
 
   const [subjects, setSubjects] = useState<Subject[]>(() => loadSubjects());
@@ -20,6 +41,21 @@ function App() {
     saveLogs(logs);
   }, [logs]);
 
+  if (!session) {
+    return <AuthPanel />;
+  }
+
+  <button
+    type="button"
+    onClick={async () => {
+      await supabase.auth.signOut();
+    }}
+    className="mb-3 text-xs text-gray-400 underline"
+  >
+    Logg ut
+  </button>
+
+
   return (
     <div className="min-h-screen text-gray-100 bg-gradient-to-b from-[#050509] via-[#0b0b12] to-[#15171a] pb-24">
       <div className="pointer-events-none fixed inset-0 opacity-40">
@@ -29,6 +65,16 @@ function App() {
       </div>
 
       <main className="relative mx-auto max-w-xl px-5 pt-6">
+        < button 
+          type="button"
+          onClick={async () => {
+            await supabase.auth.signOut();
+          }}
+          className="mb-3 text-xs text-gray-400 underline"
+        >
+          Logg ut 
+        </button> 
+        
         <div className="mb-5">
           <p className="text-[11px] uppercase tracking-[0.2em] text-gray-400">
             Clocked In
