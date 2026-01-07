@@ -1,3 +1,12 @@
+import type { Session } from "@supabase/supabase-js";
+
+import { createSubject } from "../db/subjects";
+import { setSubjectArchived } from "../db/subjects";
+import { updateSubject } from "../db/subjects";
+import { deleteSubject } from "../db/subjects";
+
+
+
 import { useEffect, useMemo, useState } from "react";
 import type { ChangeEvent } from "react";
 import type { Subject, LogEntry } from "../types";
@@ -6,7 +15,8 @@ interface SubjectsProps {
   subjects: Subject[];
   setSubjects: React.Dispatch<React.SetStateAction<Subject[]>>;
   logs: LogEntry[];
-}
+  session: Session | null;
+};
 
 function parseGoal(input: string): number | null {
   const raw = input.trim().replace(",", ".");
@@ -16,7 +26,7 @@ function parseGoal(input: string): number | null {
   return n;
 }
 
-function Subjects({ subjects, setSubjects, logs }: SubjectsProps) {
+function Subjects({ subjects, setSubjects, logs, session }: SubjectsProps) {
   // ===== Toast (2,2 sek) =====
   const [toast, setToast] = useState<string>("");
 
@@ -63,19 +73,27 @@ function Subjects({ subjects, setSubjects, logs }: SubjectsProps) {
         return a.name.localeCompare(b.name, "nb");
       });
 
-  const handleAddSubject = (): void => {
+  const handleAddSubject = async (): Promise<void> => {
     const name = newSubjectName.trim();
     const goal = parseGoal(newWeeklyGoal);
 
     if (!name) return alert("Skriv inn emnekode.");
     if (goal === null) return alert("Ukemål må være 0 eller høyere.");
 
-    const newSubject: Subject = {
-      id: Date.now(),
-      name,
-      weeklyGoal: goal,
-      isArchived: false,
-    };
+    let newSubject: Subject | null = null;
+
+    if (session) {
+      newSubject = await createSubject(session.user.id, name, goal);
+      if (!newSubject) return alert("Kunne ikke lagre faget i databasen.");
+    } else {
+      newSubject = {
+        id: Date.now(),
+        name,
+        weeklyGoal: goal,
+        isArchived: false,
+      };
+    }
+    if (!newSubject) return;
 
     setSubjects((prev) => [...prev, newSubject]);
     setNewSubjectName("");
@@ -90,16 +108,23 @@ function Subjects({ subjects, setSubjects, logs }: SubjectsProps) {
     setEditGoal(String(s.weeklyGoal ?? 0));
   };
 
-  const handleSaveEdit = (id: number): void => {
+  const handleSaveEdit = async (id: number): Promise<void> => {
     const name = editName.trim();
     const goal = parseGoal(editGoal);
 
     if (!name) return alert("Emnekode kan ikke være tomt.");
     if (goal === null) return alert("Ukemål må være 0 eller høyere.");
 
-    setSubjects((prev) =>
-      prev.map((s) => (s.id === id ? { ...s, name, weeklyGoal: goal } : s))
-    );
+    if (session) {
+      const updated = await updateSubject(id, name, goal);
+      if (!updated) return alert("Kunne ikke lagre endringen i databasen.");
+
+      setSubjects((prev) => prev.map((s) => (s.id === id ? updated : s)));
+    } else {
+      setSubjects((prev) =>
+        prev.map((s) => (s.id === id ? { ...s, name, weeklyGoal: goal } : s))
+      );
+    }
 
     setEditingId(null);
     setEditName("");
@@ -107,10 +132,18 @@ function Subjects({ subjects, setSubjects, logs }: SubjectsProps) {
     toastMsg("Oppdatert ✅");
   };
 
-  const handleArchive = (id: number): void => {
-    setSubjects((prev) =>
-      prev.map((s) => (s.id === id ? { ...s, isArchived: true } : s))
-    );
+  const handleArchive = async (id: number): Promise<void> => {
+    if (session) {
+      const updated = await setSubjectArchived(id, true);
+      if (!updated) return alert("Kunne ikke arkivere i databasen.");
+
+      setSubjects((prev) => prev.map((s) => (s.id === id ? updated : s)));
+    } else {
+      setSubjects((prev) =>
+        prev.map((s) => (s.id === id ? { ...s, isArchived: true } : s))
+      );
+    }
+
     if (editingId === id) {
       setEditingId(null);
       setEditName("");
@@ -119,14 +152,24 @@ function Subjects({ subjects, setSubjects, logs }: SubjectsProps) {
     toastMsg("Arkivert");
   };
 
-  const handleUnarchive = (id: number): void => {
-    setSubjects((prev) =>
-      prev.map((s) => (s.id === id ? { ...s, isArchived: false } : s))
-    );
+
+  const handleUnarchive = async (id: number): Promise<void> => {
+    if (session) {
+      const updated = await setSubjectArchived(id, false);
+      if (!updated) return alert("Kunne ikke gjenopprette i databasen.");
+
+      setSubjects((prev) => prev.map((s) => (s.id === id ? updated : s)));
+    } else {
+      setSubjects((prev) =>
+        prev.map((s) => (s.id === id ? { ...s, isArchived: false } : s))
+      );
+    }
+
     toastMsg("Gjenopprettet");
   };
 
-  const handlePermanentDelete = (s: Subject): void => {
+
+  const handlePermanentDelete = async (s: Subject): Promise<void> => {
     if (subjectHasLogs(s.id)) {
       alert(
         "Kan ikke slette permanent: du har logget økter på dette faget. Bruk Arkiver i stedet."
@@ -136,6 +179,14 @@ function Subjects({ subjects, setSubjects, logs }: SubjectsProps) {
 
     const ok = window.confirm(`Slett "${s.name}" permanent? Dette kan ikke angres.`);
     if (!ok) return;
+
+    if (session) {
+      const deleted = await deleteSubject(s.id);
+      if (!deleted) {
+        alert("Kunne ikke slette faget i databasen.");
+        return;
+      }
+    }
 
     setSubjects((prev) => prev.filter((x) => x.id !== s.id));
     if (editingId === s.id) {

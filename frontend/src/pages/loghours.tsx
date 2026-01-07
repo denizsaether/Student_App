@@ -1,11 +1,21 @@
+import type { Session } from "@supabase/supabase-js";
+
+import { createLog } from "../db/logs";
+import { deleteLog } from "../db/logs";
+import { updateLogDuration } from "../db/logs";
+
+
+
 import React, { useEffect, useMemo, useState } from "react";
 import type { Subject, LogEntry } from "../types";
 import { minutesToHoursText } from "../utils/format";
+
 
 interface LogHoursProps {
   subjects: Subject[];
   logs: LogEntry[];
   setLogs: React.Dispatch<React.SetStateAction<LogEntry[]>>;
+  session: Session | null;
 }
 
 type DurationMode = "preset" | "custom";
@@ -21,7 +31,7 @@ function hoursInputToMinutes(hoursInput: string): number | null {
   return Math.round(hours * 60);
 }
 
-function LogHours({ subjects, logs, setLogs }: LogHoursProps) {
+function LogHours({ subjects, logs, setLogs, session }: LogHoursProps) {
   // ===== Aktivt fag-filter (arkiverte skal ikke kunne logges) =====
   const activeSubjects = useMemo(
     () => subjects.filter((s) => !(s.isArchived ?? false)),
@@ -87,7 +97,7 @@ function LogHours({ subjects, logs, setLogs }: LogHoursProps) {
   };
 
   // ===== Logging =====
-  const handleAddLog = (): void => {
+  const handleAddLog = async(): Promise<void> => {
     if (activeSubjects.length === 0) {
       alert("Du har ingen aktive fag. Gå til Fag-siden og legg til et fag (eller gjenopprett et arkivert).");
       return;
@@ -111,17 +121,44 @@ function LogHours({ subjects, logs, setLogs }: LogHoursProps) {
       return;
     }
 
-    const now = new Date();
+    let newLog: LogEntry | null = null;
 
-    const newLog: LogEntry = {
-      id: Date.now(),
-      subjectId: chosenId,
-      durationMinutes, // ✅ lagres i minutter
-      createdAtISO: now.toISOString(),
-      createdAt: now.toLocaleString(),
-    };
+    if (session) {
+      const created = await createLog(
+        session.user.id,
+        chosenId,
+        durationMinutes
+      );
+
+      if (!created) {
+        alert("Kunne ikke lagre økten i databasen.");
+        return;
+      }
+
+      const createdDate = new Date(created.createdAt);
+
+      newLog = {
+        id: created.id,
+        subjectId: created.subjectId,
+        durationMinutes: created.durationMinutes,
+        createdAtISO: created.createdAt,
+        createdAt: createdDate.toLocaleString(),
+      };
+    } else {
+      const now = new Date();
+      newLog = {
+        id: Date.now(),
+        subjectId: chosenId,
+        durationMinutes,
+        createdAtISO: now.toISOString(),
+        createdAt: now.toLocaleString(),
+      };
+    }
+
+    if (!newLog) return;
 
     setLogs((prev) => [newLog, ...prev]);
+
 
     // UX: behold fagvalg, reset varighet
     setDurationMode("preset");
@@ -136,26 +173,47 @@ function LogHours({ subjects, logs, setLogs }: LogHoursProps) {
   const [editingLogId, setEditingLogId] = useState<number | null>(null);
   const [editHoursInput, setEditHoursInput] = useState<string>("");
 
-  const handleDeleteLog = (id: number): void => {
+  const handleDeleteLog = async (id: number): Promise<void> => {
+    if (session) {
+      const ok = await deleteLog(id);
+      if (!ok) {
+        alert("Kunne ikke slette økten i databasen.");
+        return;
+      }
+    }
+
+    // UI-opprydding (samme som før)
     setLogs((prev) => prev.filter((log) => log.id !== id));
+
     if (editingLogId === id) {
       setEditingLogId(null);
       setEditHoursInput("");
     }
+
     setToast("Slettet.");
   };
+
 
   const handleStartEdit = (log: LogEntry): void => {
     setEditingLogId(log.id);
     setEditHoursInput(String((log.durationMinutes / 60).toFixed(2)));
   };
 
-  const handleSaveEdit = (id: number): void => {
+  const handleSaveEdit = async (id: number): Promise<void> => {
     const newDurationMinutes = hoursInputToMinutes(editHoursInput);
     if (newDurationMinutes === null) {
       alert("Skriv inn et gyldig antall timer (større enn 0).");
       return;
     }
+
+    if (session) {
+      const updated = await updateLogDuration(id, newDurationMinutes);
+      if (!updated) {
+        alert("Kunne ikke oppdatere økten i databasen.");
+        return;
+      }
+    }
+    // Hvis ikke session: vi gjør bare lokal oppdatering (fallback)
 
     setLogs((prev) =>
       prev.map((log) =>

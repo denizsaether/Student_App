@@ -1,3 +1,7 @@
+import { fetchSubjects } from "./db/subjects";
+import { fetchLogs } from "./db/logs";
+
+
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "./supabaseClient";
 import AuthPanel from "./AuthPanel";
@@ -13,6 +17,8 @@ import type { Subject, LogEntry } from "./types";
 
 function App() {
   const [session, setSession] = useState<Session | null>(null);
+
+  const [subjects, setSubjects] = useState<Subject[]>(() => loadSubjects());
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -30,8 +36,19 @@ function App() {
 
   const [page, setPage] = useState<"dashboard" | "subjects" | "log">("dashboard");
 
-  const [subjects, setSubjects] = useState<Subject[]>(() => loadSubjects());
   const [logs, setLogs] = useState<LogEntry[]>(() => loadLogs());
+
+  useEffect(() => {
+    if (!session) return;
+
+    fetchSubjects().then((subjectsFromDb) => {
+      setSubjects(subjectsFromDb);
+    });
+
+    fetchLogs().then((logsFromDb) => {
+      setLogs(logsFromDb);
+    });
+  }, [session]);
 
   useEffect(() => {
     saveSubjects(subjects);
@@ -45,17 +62,6 @@ function App() {
     return <AuthPanel />;
   }
 
-  <button
-    type="button"
-    onClick={async () => {
-      await supabase.auth.signOut();
-    }}
-    className="mb-3 text-xs text-gray-400 underline"
-  >
-    Logg ut
-  </button>
-
-
   return (
     <div className="min-h-screen text-gray-100 bg-gradient-to-b from-[#050509] via-[#0b0b12] to-[#15171a] pb-24">
       <div className="pointer-events-none fixed inset-0 opacity-40">
@@ -65,7 +71,7 @@ function App() {
       </div>
 
       <main className="relative mx-auto max-w-xl px-5 pt-6">
-        < button 
+        <button 
           type="button"
           onClick={async () => {
             await supabase.auth.signOut();
@@ -100,11 +106,11 @@ function App() {
             {page === "dashboard" && <Dashboard subjects={subjects} logs={logs} />}
 
             {page === "subjects" && (
-              <Subjects subjects={subjects} setSubjects={setSubjects} logs={logs} />
+              <Subjects subjects={subjects} setSubjects={setSubjects} logs={logs} session={session} />
             )}
 
             {page === "log" && (
-              <LogHours subjects={subjects} logs={logs} setLogs={setLogs} />
+              <LogHours subjects={subjects} logs={logs} setLogs={setLogs} session={session} />
             )}
           </div>
         </div>
