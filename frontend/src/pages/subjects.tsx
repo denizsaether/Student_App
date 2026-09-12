@@ -4,6 +4,7 @@ import { createSubject } from "../db/subjects";
 import { setSubjectArchived } from "../db/subjects";
 import { updateSubject } from "../db/subjects";
 import { deleteSubject } from "../db/subjects";
+import { posthogClient } from "../posthog";
 
 
 
@@ -99,6 +100,7 @@ function Subjects({ subjects, setSubjects, logs, session }: SubjectsProps) {
     setNewSubjectName("");
     setNewWeeklyGoal("");
     setShowActive(true); // UX: vis listen når du legger til
+    posthogClient?.capture("subject_created", { weekly_goal_hours: goal });
     toastMsg("Fag lagt til ✅");
   };
 
@@ -129,6 +131,7 @@ function Subjects({ subjects, setSubjects, logs, session }: SubjectsProps) {
     setEditingId(null);
     setEditName("");
     setEditGoal("");
+    posthogClient?.capture("subject_updated", { weekly_goal_hours: goal });
     toastMsg("Oppdatert ✅");
   };
 
@@ -149,6 +152,7 @@ function Subjects({ subjects, setSubjects, logs, session }: SubjectsProps) {
       setEditName("");
       setEditGoal("");
     }
+    posthogClient?.capture("subject_archived");
     toastMsg("Arkivert");
   };
 
@@ -165,6 +169,7 @@ function Subjects({ subjects, setSubjects, logs, session }: SubjectsProps) {
       );
     }
 
+    posthogClient?.capture("subject_unarchived");
     toastMsg("Gjenopprettet");
   };
 
@@ -194,6 +199,7 @@ function Subjects({ subjects, setSubjects, logs, session }: SubjectsProps) {
       setEditName("");
       setEditGoal("");
     }
+    posthogClient?.capture("subject_deleted");
     toastMsg("Slettet");
   };
 

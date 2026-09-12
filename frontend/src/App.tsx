@@ -5,9 +5,10 @@ import { fetchLogs } from "./db/logs";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "./supabaseClient";
 import AuthPanel from "./AuthPanel";
+import { posthogClient } from "./posthog";
 
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { loadLogs, loadSubjects, saveLogs, saveSubjects } from "./storage";
 import Dashboard from "./pages/dashboard";
 import Subjects from "./pages/subjects";
@@ -17,16 +18,42 @@ import type { Subject, LogEntry } from "./types";
 
 function App() {
   const [session, setSession] = useState<Session | null>(null);
+  const identifiedUserId = useRef<string | null>(null);
 
   const [subjects, setSubjects] = useState<Subject[]>(() => loadSubjects());
 
   useEffect(() => {
+    const identifySession = (currentSession: Session | null) => {
+      if (!currentSession || identifiedUserId.current === currentSession.user.id) return;
+
+      if (identifiedUserId.current) {
+        posthogClient?.reset();
+      }
+
+      posthogClient?.identify(
+        currentSession.user.id,
+        currentSession.user.email ? { email: currentSession.user.email } : undefined,
+      );
+      identifiedUserId.current = currentSession.user.id;
+    };
+
     supabase.auth.getSession().then(({ data }) => {
+      identifySession(data.session);
       setSession(data.session);
     });
 
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => {
-      setSession(s);
+    const { data: sub } = supabase.auth.onAuthStateChange((event, currentSession) => {
+      if (event === "SIGNED_OUT") {
+        posthogClient?.capture("user_signed_out");
+        posthogClient?.reset();
+        identifiedUserId.current = null;
+      } else {
+        identifySession(currentSession);
+        if (event === "SIGNED_IN") {
+          posthogClient?.capture("user_signed_in");
+        }
+      }
+      setSession(currentSession);
     });
 
     return () => {

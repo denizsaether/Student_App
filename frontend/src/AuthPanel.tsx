@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { supabase } from "./supabaseClient";
+import { posthogClient } from "./posthog";
 
 type Mode = "signin" | "signup";
 
@@ -36,6 +37,8 @@ export default function AuthPanel() {
           show("Kunne ikke registrere. Prøv igjen, eller logg inn hvis du allerede har konto.", "error");
           return;
         }
+
+        posthogClient?.capture("account_created");
 
         // Med email-confirm: bruker må ofte bekrefte før innlogging fungerer
         show("Konto opprettet. Sjekk e-posten og bekreft. Deretter kan du logge inn.", "success");

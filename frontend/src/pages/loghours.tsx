@@ -3,6 +3,7 @@ import type { Session } from "@supabase/supabase-js";
 import { createLog } from "../db/logs";
 import { deleteLog } from "../db/logs";
 import { updateLogDuration } from "../db/logs";
+import { posthogClient } from "../posthog";
 
 
 
@@ -165,6 +166,7 @@ function LogHours({ subjects, logs, setLogs, session }: LogHoursProps) {
     setSelectedPresetMinutes(60);
     setCustomHoursInput("");
 
+    posthogClient?.capture("study_session_logged", { duration_minutes: durationMinutes });
     showSuccessToast();
   };
 
@@ -190,6 +192,7 @@ function LogHours({ subjects, logs, setLogs, session }: LogHoursProps) {
       setEditHoursInput("");
     }
 
+    posthogClient?.capture("study_session_deleted");
     setToast("Slettet.");
   };
 
@@ -223,6 +226,7 @@ function LogHours({ subjects, logs, setLogs, session }: LogHoursProps) {
 
     setEditingLogId(null);
     setEditHoursInput("");
+    posthogClient?.capture("study_session_updated", { duration_minutes: newDurationMinutes });
     showUpdatedToast();
   };
 
