@@ -20,3 +20,6 @@ SIKKERHET
 * RLS er aktivert på alle tabeller og sikrer at bruker kun har tilgang på egne data 
 * alle DB - operasjoiner er bundet til auth.uid()
 * ingen sensetiv logikk ligger i klienten
+
+
+Test fra growth-ai agent.
