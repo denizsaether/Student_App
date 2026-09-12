@@ -259,6 +259,31 @@ function LogHours({ subjects, logs, setLogs, session }: LogHoursProps) {
         </div>
       ) : (
         <>
+          {/* Primær handling (flyttet til toppen) */}
+          <section className="mb-6">
+            <button
+              type="button"
+              onClick={handleAddLog}
+              disabled={!canSubmit}
+              className="w-full py-4 rounded-xl bg-blue-600 hover:bg-blue-700 transition font-semibold tracking-wide shadow-lg shadow-black/25 disabled:opacity-40 disabled:hover:bg-blue-600"
+            >
+              Logg økt
+            </button>
+
+            <div className="mt-3 text-sm text-gray-300">
+              {logs.length === 0 ? (
+                <p>Ingen økter logget enda.</p>
+              ) : (
+                <p>
+                  Totalt logget:{" "}
+                  <span className="font-semibold text-blue-400">
+                    {minutesToHoursText(totalMinutesAllTime)} timer
+                  </span>
+                </p>
+              )}
+            </div>
+          </section>
+
           {/* 1) Velg fag */}
           <section className="mb-6 rounded-xl border border-[#2e3136] bg-[#1a1c1f] p-5 shadow-lg shadow-black/30">
             <p className="text-[11px] uppercase tracking-[0.18em] text-gray-400 mb-3">
@@ -352,31 +377,6 @@ function LogHours({ subjects, logs, setLogs, session }: LogHoursProps) {
                 <p className="text-xs text-gray-400 mt-1">Lagres internt som minutter.</p>
               </div>
             )}
-          </section>
-
-          {/* Primær handling */}
-          <section className="mb-6">
-            <button
-              type="button"
-              onClick={handleAddLog}
-              disabled={!canSubmit}
-              className="w-full py-4 rounded-xl bg-blue-600 hover:bg-blue-700 transition font-semibold tracking-wide shadow-lg shadow-black/25 disabled:opacity-40 disabled:hover:bg-blue-600"
-            >
-              Logg økt
-            </button>
-
-            <div className="mt-3 text-sm text-gray-300">
-              {logs.length === 0 ? (
-                <p>Ingen økter logget enda.</p>
-              ) : (
-                <p>
-                  Totalt logget:{" "}
-                  <span className="font-semibold text-blue-400">
-                    {minutesToHoursText(totalMinutesAllTime)} timer
-                  </span>
-                </p>
-              )}
-            </div>
           </section>
 
           {/* Historikk */}
