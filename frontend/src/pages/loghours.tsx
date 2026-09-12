@@ -362,7 +362,7 @@ function LogHours({ subjects, logs, setLogs, session }: LogHoursProps) {
               disabled={!canSubmit}
               className="w-full py-4 rounded-xl bg-blue-600 hover:bg-blue-700 transition font-semibold tracking-wide shadow-lg shadow-black/25 disabled:opacity-40 disabled:hover:bg-blue-600"
             >
-              Logg økt
+              Start session
             </button>
 
             <div className="mt-3 text-sm text-gray-300">
