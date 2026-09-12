@@ -4,6 +4,21 @@ import { posthogClient } from "./posthog";
 
 type Mode = "signin" | "signup";
 
+const AUTH_COPY: Record<Mode, { headline: string; tagline: string; ctaLabel: string; ctaColorClass: string }> = {
+  signin: {
+    headline: "Logg inn",
+    tagline: "Logg inn for å synkronisere fag og timer på tvers av enheter.",
+    ctaLabel: "Logg inn",
+    ctaColorClass: "bg-blue-600 hover:bg-blue-700",
+  },
+  signup: {
+    headline: "Opprett konto",
+    tagline: "Opprett konto med e-post. Du kan bli bedt om å bekrefte e-posten.",
+    ctaLabel: "Start session",
+    ctaColorClass: "bg-blue-600 hover:bg-blue-700",
+  },
+};
+
 export default function AuthPanel() {
   const [mode, setMode] = useState<Mode>("signin");
   const [email, setEmail] = useState("");
@@ -76,6 +91,8 @@ export default function AuthPanel() {
       ? "border-rose-400/25 bg-rose-500/10 text-rose-100"
       : "border-white/10 bg-white/5 text-gray-200";
 
+  const copy = AUTH_COPY[mode];
+
   return (
     <div className="min-h-screen text-gray-100 bg-gradient-to-b from-[#050509] via-[#0b0b12] to-[#15171a]">
       <div className="pointer-events-none fixed inset-0 opacity-40">
@@ -88,12 +105,10 @@ export default function AuthPanel() {
         <div className="mb-6">
           <p className="text-[11px] uppercase tracking-[0.2em] text-gray-400">Clocked In</p>
           <h1 className="text-2xl font-semibold tracking-tight">
-            {mode === "signin" ? "Logg inn" : "Opprett konto"}
+            {copy.headline}
           </h1>
           <p className="text-sm text-gray-400">
-            {mode === "signin"
-              ? "Logg inn for å synkronisere fag og timer på tvers av enheter."
-              : "Opprett konto med e-post. Du kan bli bedt om å bekrefte e-posten."}
+            {copy.tagline}
           </p>
         </div>
 
@@ -145,9 +160,9 @@ export default function AuthPanel() {
               type="button"
               onClick={handleSubmit}
               disabled={loading}
-              className="w-full py-3 rounded-xl bg-blue-600 hover:bg-blue-700 transition font-semibold shadow-lg shadow-black/25 disabled:opacity-50"
+              className={`w-full py-3 rounded-xl ${copy.ctaColorClass} transition font-semibold shadow-lg shadow-black/25 disabled:opacity-50`}
             >
-              {loading ? "Jobber..." : mode === "signin" ? "Logg inn" : "Opprett konto"}
+              {loading ? "Jobber..." : copy.ctaLabel}
             </button>
 
             {message && (
